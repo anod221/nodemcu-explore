@@ -50,14 +50,14 @@ PotentialD4 = {
 }
 
 PotentialH8 = {
-    {L,H,H,H},
-    {L,L,H,H},
-    {H,L,H,H},
-    {H,L,L,H},
-    {H,H,L,H},
-    {H,H,L,L},
-    {H,H,H,L},
-    {L,H,H,L},
+    PotentialS4[1],
+    PotentialD4[1],
+    PotentialS4[2],
+    PotentialD4[2],
+    PotentialS4[3],
+    PotentialD4[3],
+    PotentialS4[4],
+    PotentialD4[4],
 };
 
 Potential = { PotentialS4, PotentialD4, PotentialH8 }
