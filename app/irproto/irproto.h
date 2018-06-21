@@ -1,6 +1,8 @@
 #ifndef _IRPROTO_H
 #define _IRPROTO_H
 
+#include "c_types.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif

@@ -36,6 +36,7 @@ SUBDIRS= 					\
 	u8glib 					\
 	ucglib					\
 	smart 					\
+	irproto					\
 	modules 				\
 	spiffs 					\
 	crypto 					\
@@ -90,6 +91,7 @@ COMPONENTS_eagle.app.v6 = 			\
 	u8glib/u8glib.a 			\
 	ucglib/ucglib.a 			\
 	smart/smart.a 				\
+	irproto/irproto.a			\
 	spiffs/spiffs.a 			\
 	fatfs/libfatfs.a			\
 	crypto/libcrypto.a 			\
