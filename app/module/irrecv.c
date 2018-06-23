@@ -4,9 +4,9 @@
 #include "irproto.h"
 #include "c_stdlib.h"
 
-static uint16_t dup_mask = 0;	// set bit to 1 when pin is bind
+static uint32_t dup_mask = 0;	// set bit to 1 when pin is bind
 
-#define pin_bit(pin) ( 1<<(pin) )
+#define pin_bit(pin) ( 1<<GPIO_ID_PIN(pin_num[pin]) )
 #define pin_has_set(val, pin) ( ((val) & pin_bit(pin)) != 0 )
 #define pin_set( val, pin ) ( (val) | pin_bit(pin) )
 
@@ -52,8 +52,9 @@ static uint32 ICACHE_FLASH_ATTR gpio_intr_handler( uint32 mask ){
  
     for( int pin=0; mask > 0; mask >>= 1, ++pin ) {
       if( mask & 1 ){
-	uint32 level = 0x1 & GPIO_INPUT_GET( GPIO_ID_PIN(pin) );
-	ir_pin_reader_pointer reader = pin_reader[pin];
+	int io = pin_num_inv[pin];
+	uint32 level = platform_gpio_read( io );
+	ir_pin_reader_pointer reader = pin_reader[io];
 	level = get_proto_level( reader, level );
 	protodata = 0;
 	writebits = 0;
@@ -66,6 +67,7 @@ static uint32 ICACHE_FLASH_ATTR gpio_intr_handler( uint32 mask ){
 				    &protodata,
 				    &writebits );
 	// assert( writebits <= 8 )
+	reader->prev_pulse_time = now;
 	reader->protodata = (reader->protodata << writebits) | protodata;
 	if( reader->protodata > 0x10000 ){ // time to call the callback
 	  do_callback = 1;
@@ -113,7 +115,7 @@ static int ICACHE_FLASH_ATTR rcrecv_bind( lua_State *L ){
   }
   else{
     // set pin function
-    platform_gpio_mode(pin, PLATFORM_GPIO_OUTPUT, PLATFORM_GPIO_FLOAT );
+    platform_gpio_mode(pin, PLATFORM_GPIO_INPUT, PLATFORM_GPIO_FLOAT );
     platform_gpio_intr_init( pin, GPIO_PIN_INTR_ANYEDGE );
 
     reader = c_malloc( sizeof( ir_pin_reader ) );
@@ -124,11 +126,14 @@ static int ICACHE_FLASH_ATTR rcrecv_bind( lua_State *L ){
     set_init_level( reader, level );
     reader->protodata = 1;
     reader->proto = ir_recv_nec;
-
+    pin_reader[pin] = reader;
+    
     // update hook mask
     dup_mask = pin_set(dup_mask, pin);
-    platform_gpio_register_intr_hook(dup_mask, gpio_intr_handler);    
+    platform_gpio_register_intr_hook(dup_mask, gpio_intr_handler);
   }
+  platform_gpio_mode(4, PLATFORM_GPIO_OUTPUT, PLATFORM_GPIO_FLOAT);
+  platform_gpio_write(4, PLATFORM_GPIO_HIGH);
 }
 
 // Module function map
