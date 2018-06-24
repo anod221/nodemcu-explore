@@ -7,7 +7,11 @@
 extern "C" {
 #endif
 
-  uint32 ir_recv_nec( uint32, uint32, uint32, int32_t*, int8_t* );
+#define IRPROTO_LEVEL_CURRENT(level) ((level) & 0xff)
+#define IRPROTO_LEVEL_PREVENT(level) (((level) & 0xff00)>>8)
+#define IRPROTO_LEVEL_PARAM(current, prevent) ((((current) & 0xff)) | (((prevent)<<8) & 0xff00))
+  
+  uint32 ir_recv_nec( uint32, uint32, uint32, uint32_t*, int8_t*, int8_t* );
   
 #ifdef __cplusplus
 }
