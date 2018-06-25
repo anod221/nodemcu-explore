@@ -47,11 +47,11 @@ static ir_pin_reader_pointer pin_reader[GPIO_PIN_NUM];
 #define get_prev_level( reader ) (((reader)->flag & (1<<FLAG_PREVLV_BIT))>>FLAG_PREVLV_BIT)
 #define set_prev_level( reader, level ) (reader)->flag = (level) ? ((reader)->flag | (1<<FLAG_PREVLV_BIT)) : ((reader)->flag & ~(1<<FLAG_PREVLV_BIT))
 
-#define set_init_level( reader, level ) (reader)->flag = (level) ? ((reader)->flag | (1<<FLAG_INITLV_BIT)) : ((reader)->flag & ~(1<<FLAG_READY_BIT))
+#define set_init_level( reader, level ) (reader)->flag = (level) ? ((reader)->flag | (1<<FLAG_INITLV_BIT)) : ((reader)->flag & ~(1<<FLAG_INITLV_BIT))
 #define reset_init_level( reader ) set_prev_level( reader, (reader)->flag & (1<<FLAG_INITLV_BIT) )
 
 #define get_proto_validbit( reader ) ( (reader)->flag & ((1<<(FLAG_VALID_BIT+1))-1) )
-#define set_proto_validbit( reader, bitlen ) (reader)->flag |= ((1<<(FLAG_VALID_BIT+1))-1) & (bitlen)
+#define set_proto_validbit( reader, bitlen ) (reader)->flag = ((reader)->flag & ~((1<<(FLAG_VALID_BIT+1))-1)) | ((1<<(FLAG_VALID_BIT+1))-1) & (bitlen)
 #define get_proto_dataready( reader ) (((reader)->flag & (1<<FLAG_READY_BIT))>>FLAG_READY_BIT)
 #define set_proto_dataready( reader, ready ) (reader)->flag = (ready) ? ((reader)->flag | (1<<FLAG_READY_BIT)) : ((reader)->flag & ~(1<<FLAG_READY_BIT))
 
@@ -86,7 +86,10 @@ static uint32 ICACHE_FLASH_ATTR gpio_intr_handler( uint32 mask ){
 	reader->protodata = protodata;
 	set_proto_validbit(reader, writebits);
 	set_proto_dataready( reader, protoready );
-	if( protoready ) do_callback = 1;
+	if( protoready ) {
+	  do_callback = 1;
+	  c_printf("read: %x[sz=%d]\n", protodata, writebits);
+	}
       }
     }
 
@@ -121,7 +124,7 @@ static int ICACHE_FLASH_ATTR rcrecv_bind( lua_State *L ){
       luaL_unref(L, LUA_REGISTRYINDEX, reader->callback);
     }
 
-    reader->state = -1;
+    reader->state = IRPROTO_STATE_ERROR;
     reader->prev_pulse_time = 0;
     reader->callback = callback;
     reset_init_level( reader );
@@ -136,7 +139,7 @@ static int ICACHE_FLASH_ATTR rcrecv_bind( lua_State *L ){
     platform_gpio_intr_init( pin, GPIO_PIN_INTR_ANYEDGE );
 
     reader = c_malloc( sizeof( ir_pin_reader ) );
-    reader->state = -1;
+    reader->state = IRPROTO_STATE_ERROR;
     reader->prev_pulse_time = 0;
     reader->callback = callback;
     uint32 level = platform_gpio_read( pin );
@@ -147,7 +150,8 @@ static int ICACHE_FLASH_ATTR rcrecv_bind( lua_State *L ){
     reader->protodata = 0;
     reader->proto = ir_recv_nec;
     pin_reader[pin] = reader;
-    
+
+    c_printf("err?%d %x", get_proto_validbit(reader), reader->flag);
     // update hook mask
     dup_mask = pin_set(dup_mask, pin);
     platform_gpio_register_intr_hook(dup_mask, gpio_intr_handler);

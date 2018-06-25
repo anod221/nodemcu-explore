@@ -19,7 +19,7 @@
 #define u32_byte_reverse(c) ( ((c) & 0x000000FFU) << 24 |	\
 			      ((c) & 0x0000FF00U) << 8 |	\
 			      ((c) & 0x00FF0000U) >> 8 |	\
-			      ((c) & 0xFF000000U) >> 24 ) )
+			      ((c) & 0xFF000000U) >> 24 ) 
 
 // state
 enum{
@@ -43,7 +43,7 @@ uint32 ir_recv_nec(uint32 state, uint32 level, uint32 usec, uint32_t *data, int8
   if( usec > UNCERTAIN_PULSE_TIME ) {
     return AGC_EXPECT;
   }
-  c_printf("dec,state=%d usec=%d len=%d\n", state, usec, *len);
+
   if( state == AGC_EXPECT )
     return match( usec, AGC_BURST, AGC_GOES );
   else if( state == AGC_GOES ){
