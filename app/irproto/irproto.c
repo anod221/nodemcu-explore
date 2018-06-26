@@ -68,14 +68,10 @@ uint32 ir_recv_nec(uint32 state, uint32 level, uint32 usec, uint32_t *data, int8
     else return IRPROTO_STATE_ERROR;
     
     (*len)++;
-    if( *len == 32 ){
-      *ready = 1;
-      return EOP_EXPECT;
-    }
-    else return LOGICAL_EXPECT;
+    return ( *len == 32 ) ? EOP_EXPECT : LOGICAL_EXPECT;
   }
   else if( state == EOP_EXPECT ){
-    *ready = (*len == 32) ? 1 : 0;
+    *ready = 1;
     return match( usec, LOGICAL_BURST, EOP_GOES );
   }
   else return IRPROTO_STATE_ERROR;

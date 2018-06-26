@@ -103,8 +103,8 @@ local function method( static )
         if param.step <= param.loop then
             param.step = param.step + 1
         else
-            if static.cb then
-                pcall( static.cb )
+            if param.cb then
+                pcall( param.cb )
             end
             static.r = nil
         end
