@@ -3,23 +3,15 @@
 #include "platform.h"
 #include "irproto.h"
 #include "c_stdlib.h"
+#include "task/task.h"
 
+static task_handle_t callback_stub;
 static uint32_t dup_mask = 0;	// set bit to 1 when pin is bind
 
 #define pin_bit(pin) ( 1<<GPIO_ID_PIN(pin_num[pin]) )
 #define pin_has_set(val, pin) ( ((val) & pin_bit(pin)) != 0 )
 #define pin_set( val, pin ) ( (val) | pin_bit(pin) )
 
-// 就是一个状态机。为了能够兼容多数的红外协议，所以
-// 需要替换proto函数
-typedef uint32 (*irproto)( 	// 返回：下一状态
-  uint32 state, 		// 当前状态
-  uint32 level, 		// b[8]上一个中断点位, b[0]当前中断电位
-  uint32 pulse_edge_usec,	// 距离上一个脉冲边缘的时间，单位为毫秒
-  uint32_t *protodata,		// 此次处理得到的数据写入到protodata
-  int8_t *write_bits,		// 此次处理总共写入了多少个位到protodata
-  int8_t *data_ready		// 是否应该开始回调luac脚本
-);
 typedef struct {
   int                 state;		// 当前状态
   uint32              prev_pulse_time;  // 上一个edge到达时间
@@ -86,26 +78,54 @@ static uint32 ICACHE_FLASH_ATTR gpio_intr_handler( uint32 mask ){
 	reader->protodata = protodata;
 	set_proto_validbit(reader, writebits);
 	set_proto_dataready( reader, protoready );
-	if( protoready ) {
-	  do_callback = 1;
-	  c_printf("read: %x[sz=%d]\n", protodata, writebits);
-	}
+	do_callback = do_callback || protoready;
       }
     }
 
     if( do_callback ){
-      /* TODO: 调度回调任务 */
+      task_post_medium( callback_stub, (task_param_t)0 );
     }
   }
   return mask & (~dup_mask);
 }
 
+static void perform_ondata_callback( lua_State *L, ir_pin_reader_pointer reader ){
+  uint32_t v = reader->protodata;
+  uint32_t len = get_proto_validbit(reader);
+  int narg = 0;
+  if( len > 0 ){
+    lua_rawgeti(L, LUA_REGISTRYINDEX, reader->callback);
+    for( narg = 0 ; len > 0; len -= 8, v >>= 8, ++narg ){
+      lua_pushinteger(L, v & 0xff);
+    }
+    lua_call(L, narg, 0);
+  }
+}
+
+// callback the lua function for the pin which protodata is ready 
+static void irrecv_ondata(task_param_t param, uint8 priority)
+{
+  uint32_t n;
+  int pin;
+  lua_State *L = lua_getstate();
+  for( n = dup_mask, pin = 0; n > 0; ++pin, n >>= 1 ){
+    if( n & 1 ){
+      int io = pin_num_inv[pin];
+      ir_pin_reader_pointer reader = pin_reader[io];
+      if( get_proto_dataready(reader) ){
+	perform_ondata_callback(L, reader);
+      }
+    }
+  }
+}
+
 // irrecv.bind( pin, protocol, callback_fun( n ) end )
-static int ICACHE_FLASH_ATTR rcrecv_bind( lua_State *L ){
+static int ICACHE_FLASH_ATTR irrecv_bind( lua_State *L ){
   const uint8_t pin = luaL_checkinteger(L, 1);
   luaL_argcheck(L, 0 <= pin && pin < GPIO_PIN_NUM, 1, "invalid pin index");
 
   const int type = luaL_checkinteger( L, 2 );
+  luaL_argcheck(L, 0 < type && type < IRPROTO_MAX, 2, "invalid protocol");
     
   int callback = LUA_NOREF;
   if( lua_type(L, 3) == LUA_TFUNCTION
@@ -151,24 +171,30 @@ static int ICACHE_FLASH_ATTR rcrecv_bind( lua_State *L ){
     reader->proto = ir_recv_nec;
     pin_reader[pin] = reader;
 
-    c_printf("err?%d %x", get_proto_validbit(reader), reader->flag);
     // update hook mask
     dup_mask = pin_set(dup_mask, pin);
     platform_gpio_register_intr_hook(dup_mask, gpio_intr_handler);
   }
+  // TODO: DELETE BEGIN
   platform_gpio_mode(4, PLATFORM_GPIO_OUTPUT, PLATFORM_GPIO_FLOAT);
   platform_gpio_write(4, PLATFORM_GPIO_HIGH);
+  // TODO: DELETE END
 }
 
 // Module function map
 static const LUA_REG_TYPE irrecv_map[] = {
-  { LSTRKEY( "bind" ), LFUNCVAL( rcrecv_bind ) },
+  // for module function
+  { LSTRKEY( "bind" ), LFUNCVAL( irrecv_bind ) },
+  // for module constant
+  { LSTRKEY( "NEC" ), LNUMVAL( IRPROTO_NEC ) },
+  // ---------
   { LNILKEY, LNILVAL }
 };
 
 int luaopen_irrecv( lua_State *L ){
   // TODO: Make sure that the GPIO system is initialized
   os_bzero( pin_reader, sizeof(ir_pin_reader_pointer) * GPIO_PIN_NUM );
+  callback_stub = task_get_id( irrecv_ondata );
   return 0;
 }
 

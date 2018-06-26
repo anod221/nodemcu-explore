@@ -11,6 +11,24 @@ extern "C" {
 #define IRPROTO_LEVEL_PREVENT(level) (((level) & 0xff00)>>8)
 #define IRPROTO_LEVEL_PARAM(current, prevent) ((((current) & 0xff)) | (((prevent)<<8) & 0xff00))
 #define IRPROTO_STATE_ERROR -1
+
+  enum {
+    IRPROTO_NEC = 1,
+    IRPROTO_MAX
+  };
+
+  // 就是一个状态机。为了能够兼容多数的红外协议，所以
+  // 需要替换proto函数
+  typedef uint32 (*irproto)( 	// 返回：下一状态
+    uint32 state, 		// 当前状态
+    uint32 level, 		// b[8]上一个中断点位, b[0]当前中断电位
+    uint32 pulse_edge_usec,	// 距离上一个脉冲边缘的时间，单位为毫秒
+    uint32_t *protodata,	// 此次处理得到的数据写入到protodata
+    int8_t *write_bits,		// 此次处理总共写入了多少个位到protodata
+    int8_t *data_ready		// 是否应该开始回调luac脚本
+  );
+  
+  irproto irproto_decode_map[IRPROTO_MAX];
   
   uint32 ir_recv_nec( uint32, uint32, uint32, uint32_t*, int8_t*, int8_t* );
   
