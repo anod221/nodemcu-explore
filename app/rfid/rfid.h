@@ -7,11 +7,10 @@
 //extern "C"{
 #endif
 
-// see: https://github.com/ondryaso/pi-rc522
-
-// page0: for command and status
 enum {
-  CommandReg = 1,
+  // page0: for command and status
+  Reserved__00,
+  CommandReg,
   CommIEnReg,
   DivIEnReg,
   CommIrqReg,
@@ -24,12 +23,11 @@ enum {
   WaterLevelReg,
   ControlReg,
   BitFramingReg,
-  CollReg
-};
-
-// page1: register for command
-enum{
-  ModeReg = 1,
+  CollReg,
+  Reserved__0f,
+  // page1: register for command
+  Reserved__10,
+  ModeReg,
   TxModeReg,
   RxModeReg,
   TxControlReg,
@@ -38,30 +36,32 @@ enum{
   RxSelReg,
   RxThresholdReg,
   DemodReg,
-  MifareReg = 0xc,
-  SerialSpeedReg = 0xf
-};
-
-// page2: register for CFG
-enum{
-  CRCResultRegL = 1,
+  Reserved__1a,
+  Reserved__1b,
+  MifareReg,
+  Reserved__1d,
+  Reserved__1e,
+  SerialSpeedReg,
+  // page2: register for CFG
+  Reserved__20,
+  CRCResultRegL,
   CRCResultRegH,
-  ModWidthReg = 4,
-  RfCfgReg = 6,
+  Reserved__23,
+  ModWidthReg,
+  Reserved__25,
+  RFCfgReg,
   GsNReg,
   CWGsPReg,
   ModGsPReg,
   TModeReg,
   TPrescalerReg,
-  TReloadRegL,
   TReloadRegH,
+  TReloadRegL,
+  TCounterValueRegH,
   TCounterValueRegL,
-  TCounterValueRegH
-};
-
-// page3: register for test
-enum{
-  TestSel1Reg = 1,
+  // page3: register for test
+  Reserved__30,
+  TestSel1Reg,
   TestSel2Reg,
   TestPinEnReg,
   TestPinValueReg,
@@ -71,7 +71,11 @@ enum{
   AnalogTestReg,
   TestDAC1Reg,
   TestDAC2Reg,
-  TestADCReg
+  TestADCReg,
+  Reserved__3c,
+  Reserved__3d,
+  Reserved__3e,
+  Reserved__3f
 };
 
 typedef uint8_t u8;
@@ -287,6 +291,10 @@ typedef struct {
 #define CMD_MFAUTHENT          14
 #define CMD_SOFT_RESET         15
 
+/* 
+   basic outter function
+   see: https://github.com/ondryaso/pi-rc522
+ */
 int rfid_init();
 int rfid_request();
 int rfid_anticoll();
