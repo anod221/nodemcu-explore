@@ -29,27 +29,27 @@ Module.H8 = 3           -- 8拍，h指的是hybrid
 Module.CCW = 1          -- 方向，逆时针
 Module.CW = 2           -- 方向，顺时针
 
-StepPerDegree = 2048/360
+local StepPerDegree = 2048/360
 
-DefSpeed = 10
+local DefSpeed = 10
 
-L, H = gpio.LOW, gpio.HIGH
+local L, H = gpio.LOW, gpio.HIGH
 
-PotentialS4 = {
+local PotentialS4 = {
     {L,H,H,H},
     {H,L,H,H},
     {H,H,L,H},
     {H,H,H,L},
 }
 
-PotentialD4 = {
+local PotentialD4 = {
     {L,L,H,H},
     {H,L,L,H},
     {H,H,L,L},
     {L,H,H,L},
 }
 
-PotentialH8 = {
+local PotentialH8 = {
     PotentialS4[1],
     PotentialD4[1],
     PotentialS4[2],
@@ -60,7 +60,7 @@ PotentialH8 = {
     PotentialD4[4],
 };
 
-Potential = { PotentialS4, PotentialD4, PotentialH8 }
+local Potential = { PotentialS4, PotentialD4, PotentialH8 }
 
 -- end static variable
 
@@ -182,5 +182,4 @@ end
 
 -- mount the module
 Module.create = create
-global[modname] = Module
 return Module
