@@ -78,13 +78,17 @@ void rc522_antenna( rfid_dev dev, AntennaStatus st )
 }
 
 // ======== for send command ========
+#define clear_fifo(dev) { \
+  bFIFOLevelReg flag = {0, 1};			\
+  writereg(dev, FIFOLevelReg, flag);		\
+  }
+
 static int to_fifo(rfid_dev dev, u8 *buff, size_t sz)
 {
   if( sz > FIFO_SIZE ) return -1;
 
   // clear FIFO
-  bFIFOLevelReg flag = { 0, 1 };
-  writereg( dev, FIFOLevelReg, flag );
+  clear_fifo( dev );
 
   // send multi bytes at one time
   RC522_SPI_OPEN( dev );
@@ -127,7 +131,6 @@ static size_t from_fifo(rfid_dev dev, u8 *buff)
 
 static void wait_cmd( dev )
 {
-  uint32_t tick = system_get_time();
   bCommandReg r = readreg(dev, CommandReg);
   
   switch( r.Command ){
@@ -157,6 +160,109 @@ static void wait_cmd( dev )
   return 0;
 }
 
+#define exec_cmd( dev, cmd ) {			\
+  bCommandReg bcmd = {cmd, 0, 0};		\
+  writereg( dev, CommandReg, bcmd );		\
+  }
+
+#define rc522_cmd_nofifo exec_cmd
+
+#define wait_crc_done(dev) { \
+  bStatus1Reg bst = readreg(dev, Status1Reg); \  
+while( bst.CRCReady == 0 ){			\
+  system_soft_wdt_feed();			\
+  os_delay_us( 100 );				\
+  bst = readreg(dev, Status1Reg);		\
+ }						\
+}
+
+static int rc522_cmd_crc( rfid_dev dev, u8* buff, size_t sz )
+{
+  // if current command is crc then fill fifo only
+  bCommandReg bcmd = readreg(dev, CommandReg);
+  if( r.Command == CMD_CALC_CRC ){
+    wait_crc_done( dev );
+    to_fifo(dev, buff, sz);
+  }
+  else {
+    wait_cmd( dev );
+    to_fifo(dev, buff, sz);
+
+    bcmd = {CMD_CALC_CRC, 0, 0};
+    writereg(dev, CommandReg, bcmd);
+  }
+
+  wait_crc_done(dev);
+
+  // read the result
+  bCRCResultRegL brl = readreg( dev, CRCResultRegL );
+  bCRCResultRegH brh = readreg( dev, CRCResultRegH );
+  return (brh.CRCResultMSB << 8) | brl.CRCResultLSB;
+}
+
+static int rc522_cmd_readfifo( rfid_dev dev, u8 *buff )
+{
+  wait_cmd( dev );
+
+  // flush the fifo
+  clear_fifo( dev );
+  writereg( dev, FIFOLevelReg, flag );
+
+  // exec the cmd
+  exec_cmd( dev, CMD_TRANSMIT );
+  wait_cmd( dev );
+  
+  // read
+  size_t retval = from_fifo( dev, buff );
+  return (int) retval;
+}
+
+#define MEM_PROTOCOL_SIZE 25
+static int rc522_cmd_mem(rfid_dev dev, u8 *buff, u8 isWrite)
+{
+  wait_cmd( dev );
+
+  bCommandReg bcmd = {CMD_MEM, 0, 0};
+  if( isWrite ){
+    to_fifo(dev, buff, MEM_PROTOCOL_SIZE);
+    writereg( dev, CommandReg, bcmd );
+    wait_cmd( dev );
+  }
+  else {
+    clear_fifo(dev);
+    writereg( dev, CommandReg, bcmd );
+    wait_cmd( dev );
+    from_fifo(dev, buff);
+  }
+  
+  return MEM_PROTOCOL_SIZE;
+}
+
+#define AUTH_PROTOCOL_SIZE 12
+
+static int rc522_cmd_auth( rfid_dev dev, u8 *data )
+{
+  wait_cmd(dev);
+  to_fifo(dev, data, AUTH_PROTOCOL_SIZE);
+  exec_cmd(dev, CMD_MFAUTHENT);
+  wait_cmd(dev);
+
+  bErrorReg err = readreg(dev, ErrorReg);
+  if( err.ProtocolErr ) return -1;
+  
+  bStatus2Reg res = readreg(dev, Status2Reg);
+  if( res.MFCrypto1On )
+    return 1;
+  else return 0;
+}
+
+static int rc522_cmd_transceive(rfid_dev dev, u8 *arg, size_t szarg, u8 *res)
+{
+  wait_cmd( dev );
+  
+  
+}
+
 // name        num FIFO :len:   :flush:   :fin:
 // Idle         0    n    -        -        Y
 // Mem          1   Y     25    Y@r,n@w     Y
@@ -167,53 +273,39 @@ static void wait_cmd( dev )
 // Receive      8    n    -        -        Y
 // Transceive   12  Y     ∞        Y        n
 // MFAuthent    14  Y     12       n        Y
-// SoftReset    15   n    -        -        Y        
+// SoftReset    15   n    -        -        Y
+
+// retval: <0 == error  >=0 == result
 int rc522_sendcmd(
    rfid_dev dev, u8 cmd,
    u8 *arg, size_t szarg,
-   u8 *res, size_t *rzres )
+   u8 *res )
 {
   // without FIFO
   switch( cmd ){
   case CMD_IDLE:
+    rc522_cmd_nofifo(dev, cmd);
+    return 1;
   case CMD_GENERATE_RANDOM_ID:
   case CMD_NO_CMD_CHANGE:
   case CMD_RECEIVE:
   case CMD_SOFT_RESET:
-    bCommandReg bcmd = {cmd, 0, 0};
-    writereg( dev, CommandReg, bcmd );
-    return wait_cmd(dev);
-  }
-
-  // prevent the command won't auto finish
-  wait_cmd( dev );
-
-  // prepare the fifo
-  to_fifo(dev, arg, szarg);
-
-  // send command
-  bCommandReg command = {cmd, 0, 0};
-  writereg( dev, CommandReg, command );
-
-  // active transceive sending
-  if( cmd == CMD_TRANSCEIVE ){
-    bBitFramingReg bf = readreg( dev, BitFramingReg );
-    bf.StartSend = 1;
-    writereg( dev, BitFramingReg, bf );
-  }
-
-  if( cmd == CMD_CALC_CRC ){
-  }
-  else if( cmd == CMD_TRANSCEIVE ){
-    
-  }
-  else {
-    // Mem Transmit MFAuthent
+    rc522_cmd_nofifo(dev, cmd);
     wait_cmd(dev);
-    if( cmd_error( dev ) )
-      return -1;
-    
-    *szres = from_fifo(dev, res);
+    return 1;
+  case CMD_CALC_CRC:
+    return rc522_cmd_crc(dev, arg, szarg);
+  case CMD_TRANSMIT:
+    return rc522_cmd_readfifo(dev, res);
+  case CMD_MEM:
+    if( arg == NULL )
+      return rc522_cmd_mem(dev, res, 0);
+    else
+      return rc522_cmd_mem(dev, arg, 1);
+  case CMD_MFAUTHENT:
+    return rc522_cmd_auth(dev, arg);
+  case CMD_TRANSCEIVE:
+  default:
+    return rc522_cmd_transceive(dev, arg, szarg, res);
   }
-  return 0;
 }

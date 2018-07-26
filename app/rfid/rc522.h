@@ -325,6 +325,7 @@ void rc522_sendcmd( rfid_dev dev, u8 cmd,
 		    u8 *arg=NULL, size_t szarg=0,
 		    u8 *res=NULL, size_t *szres=NULL);
 void rc522_antenna( rfid_dev, AntennaStatus );
+int rc522_selftest( rfid_dev );
 
 #ifdef __cplusplus
 //}
