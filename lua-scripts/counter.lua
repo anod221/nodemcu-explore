@@ -21,14 +21,22 @@ setfenv( 1, setmetatable({}, {
 
 -- begin static variable
 
-pin_index = {}
-one_second = 1000 * 1000
+local pin_index = {}
+local one_second = 1000 * 1000
 
 -- end static variable
 
 -- 公开方法
 local function method( static )
     local class = {}
+
+    local function _incr( time )
+        if static.r + one_second < time then
+            static.c = static.n
+            static.r = time - time % one_second
+        end
+        static.n = static.n + 1
+    end
 
     -- 所有method都需要有返回值
     function class:_init()                  -- 初始化
@@ -38,22 +46,13 @@ local function method( static )
             "down",
             function( level, when )
                 if level == 1 then
-                    self:_incr( when )
+                    _incr( when )
                     if static.cb then
                         static.cb(when)
                     end -- end of if static.cb
                 end -- end of if level
             end -- end of function
         )
-        return self
-    end
-
-    function class:_incr( time )
-        if static.r + one_second < time then
-            static.c = static.n
-            static.r = time - time % one_second
-        end
-        static.n = static.n + 1
         return self
     end
 
@@ -120,5 +119,4 @@ end
 
 -- mount the module
 Module.create = create
-global[modname] = Module
 return Module

@@ -21,7 +21,7 @@ setfenv( 1, setmetatable({}, {
 
 -- begin static variable
 
-pin_index = {}
+local pin_index = {}
 Module.ACTIVE_ON_LOW = gpio.LOW
 Module.ACTIVE_ON_HIGH = gpio.HIGH
 Module.CIRCUIT_NORMAL_OPEN = 0
@@ -60,7 +60,6 @@ local function method( static )
                 l = gpio.LOW
             else l = gpio.HIGH end
         end
-        print("off", l)
         gpio.write( static.p, l )
         
         return self
@@ -109,5 +108,4 @@ end
 
 -- mount the module
 Module.create = create
-global[modname] = Module
 return Module
