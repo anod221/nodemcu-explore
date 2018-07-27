@@ -37,6 +37,7 @@ SUBDIRS= 					\
 	ucglib					\
 	smart 					\
 	irproto					\
+	rfid					\
 	modules 				\
 	spiffs 					\
 	crypto 					\
@@ -92,6 +93,7 @@ COMPONENTS_eagle.app.v6 = 			\
 	ucglib/ucglib.a 			\
 	smart/smart.a 				\
 	irproto/irproto.a			\
+	rfid/rfid.a				\
 	spiffs/spiffs.a 			\
 	fatfs/libfatfs.a			\
 	crypto/libcrypto.a 			\

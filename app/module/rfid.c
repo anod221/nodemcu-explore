@@ -6,14 +6,15 @@
 
 static const LUA_REG_TYPE rfid_map[] = {
   // for module function
-  { LSTRKEY("setup"),  },
-  { LSTRKEY("request"),  },
-  { LSTRKEY("anticoll"), },
-  { LSTRKEY("select"), },
-  { LSTRKEY("auth"), },
-  { LSTRKEY("read"), },
+  //  { LSTRKEY("setup"),  },
+  //  { LSTRKEY("request"),  },
+  //  { LSTRKEY("anticoll"), },
+  //  { LSTRKEY("select"), },
+  //  { LSTRKEY("auth"), },
+  //  { LSTRKEY("read"), },
   // for module constant
-  { LNILKEY, LNILKEY }
+  { LSTRKEY("test"), LNUMVAL(20) },
+  { LNILKEY, LNILVAL }
 };
 
 NODEMCU_MODULE( RFID, "rfid", rfid_map, NULL );

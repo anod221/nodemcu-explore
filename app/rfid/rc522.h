@@ -7,78 +7,8 @@
 //extern "C"{
 #endif
 
-enum {
-  // page0: for command and status
-  Reserved__00,
-  CommandReg,
-  CommIEnReg,
-  DivIEnReg,
-  CommIrqReg,
-  DivIrqReq,
-  ErrorReg,
-  Status1Reg,
-  Status2Reg,
-  FIFODataReg,
-  FIFOLevelReg,
-  WaterLevelReg,
-  ControlReg,
-  BitFramingReg,
-  CollReg,
-  Reserved__0f,
-  // page1: register for command
-  Reserved__10,
-  ModeReg,
-  TxModeReg,
-  RxModeReg,
-  TxControlReg,
-  TxAutoReg,
-  TxSelReg,
-  RxSelReg,
-  RxThresholdReg,
-  DemodReg,
-  Reserved__1a,
-  Reserved__1b,
-  MifareReg,
-  Reserved__1d,
-  Reserved__1e,
-  SerialSpeedReg,
-  // page2: register for CFG
-  Reserved__20,
-  CRCResultRegL,
-  CRCResultRegH,
-  Reserved__23,
-  ModWidthReg,
-  Reserved__25,
-  RFCfgReg,
-  GsNReg,
-  CWGsPReg,
-  ModGsPReg,
-  TModeReg,
-  TPrescalerReg,
-  TReloadRegH,
-  TReloadRegL,
-  TCounterValueRegH,
-  TCounterValueRegL,
-  // page3: register for test
-  Reserved__30,
-  TestSel1Reg,
-  TestSel2Reg,
-  TestPinEnReg,
-  TestPinValueReg,
-  TestBusReg,
-  AutoTestReg,
-  VersionReg,
-  AnalogTestReg,
-  TestDAC1Reg,
-  TestDAC2Reg,
-  TestADCReg,
-  Reserved__3c,
-  Reserved__3d,
-  Reserved__3e,
-  Reserved__3f
-};
-
 typedef uint8_t u8;
+
 /* CommandReg */
 typedef struct {
   u8 Command:4;
@@ -93,7 +23,7 @@ typedef struct{
 typedef struct {
 u8 :2, CRCIEn:1, :1;
   u8 SigninActIEn:1, :2, IRQPushPull:1;
-} bDivEnReg;
+} bDivIEnReg;
 /* CommIRqReg */
 typedef struct {
   u8 TimerIRq:1, ErrIRq:1, LoAlertIRq:1, HiAlertIRq:1;
@@ -289,6 +219,131 @@ typedef struct {
   u8 ADC_I:4;
 } bTestADCReg;
 
+typedef uint8_t bRegister;
+
+typedef union {
+  bCommandReg bCommandReg;
+  bCommIEnReg bCommIEnReg;
+  bDivIEnReg bDivIEnReg;
+  bCommIRqReg bCommIRqReg;
+  bDivIRqReq bDivIRqReq;
+  bErrorReg bErrorReg;
+  bStatus1Reg bStatus1Reg;
+  bStatus2Reg bStatus2Reg;
+  bFIFODataReg bFIFODataReg;
+  bFIFOLevelReg bFIFOLevelReg;
+  bWaterLevelReg bWaterLevelReg;
+  bControlReg bControlReg;
+  bBitFramingReg bBitFramingReg;
+  bCollReg bCollReg;
+  bModeReg bModeReg;
+  bTxModeReg bTxModeReg;
+  bRxModeReg bRxModeReg;
+  bTxControlReg bTxControlReg;
+  bTxAutoReg bTxAutoReg;
+  bTxSelReg bTxSelReg;
+  bRxSelReg bRxSelReg;
+  bRxThresholdReg bRxThresholdReg;
+  bDemodReg bDemodReg;
+  bSerialSpeedReg bSerialSpeedReg;
+  bCRCResultRegL bCRCResultRegL;
+  bCRCResultRegH bCRCResultRegH;
+  bModWidthReg bModWidthReg;
+  bRFCfgReg bRFCfgReg;
+  bGsNReg bGsNReg;
+  bCWGsPReg bCWGsPReg;
+  bModGsPReg bModGsPReg;
+  bTModeReg bTModeReg;
+  bTPrescalerReg bTPrescalerReg;
+  bTReloadRegL bTReloadRegL;
+  bTReloadRegH bTReloadRegH;
+  bTCounterValRegL bTCounterValRegL;
+  bTCounterValRegH bTCounterValRegH;
+  bTestSel1Reg bTestSel1Reg;
+  bTestSel2Reg bTestSel2Reg;
+  bTestPinEnReg bTestPinEnReg;
+  bTestPinValueReg bTestPinValueReg;
+  bTestBusReg bTestBusReg;
+  bAutoTestReg bAutoTestReg;
+  bVersionReg bVersionReg;
+  bAnalogTestReg bAnalogTestReg;
+  bTestDAC1Reg bTestDAC1Reg;
+  bTestDAC2Reg bTestDAC2Reg;
+  bTestADCReg bTestADCReg;
+  u8 bRegister;
+} Rc522Reg;
+
+enum {
+  // page0: for command and status
+  Reserved__00,
+  CommandReg,
+  CommIEnReg,
+  DivIEnReg,
+  CommIrqReg,
+  DivIrqReq,
+  ErrorReg,
+  Status1Reg,
+  Status2Reg,
+  FIFODataReg,
+  FIFOLevelReg,
+  WaterLevelReg,
+  ControlReg,
+  BitFramingReg,
+  CollReg,
+  Reserved__0f,
+  // page1: register for command
+  Reserved__10,
+  ModeReg,
+  TxModeReg,
+  RxModeReg,
+  TxControlReg,
+  TxAutoReg,
+  TxSelReg,
+  RxSelReg,
+  RxThresholdReg,
+  DemodReg,
+  Reserved__1a,
+  Reserved__1b,
+  MifareReg,
+  Reserved__1d,
+  Reserved__1e,
+  SerialSpeedReg,
+  // page2: register for CFG
+  Reserved__20,
+  CRCResultRegL,
+  CRCResultRegH,
+  Reserved__23,
+  ModWidthReg,
+  Reserved__25,
+  RFCfgReg,
+  GsNReg,
+  CWGsPReg,
+  ModGsPReg,
+  TModeReg,
+  TPrescalerReg,
+  TReloadRegH,
+  TReloadRegL,
+  TCounterValueRegH,
+  TCounterValueRegL,
+  // page3: register for test
+  Reserved__30,
+  TestSel1Reg,
+  TestSel2Reg,
+  TestPinEnReg,
+  TestPinValueReg,
+  TestBusReg,
+  AutoTestReg,
+  VersionReg,
+  AnalogTestReg,
+  TestDAC1Reg,
+  TestDAC2Reg,
+  TestADCReg,
+  Reserved__3c,
+  Reserved__3d,
+  Reserved__3e,
+  Reserved__3f
+};
+
 // Command Set
 #define CMD_IDLE               0
 #define CMD_MEM                1
@@ -301,16 +356,16 @@ typedef struct {
 #define CMD_MFAUTHENT          14
 #define CMD_SOFT_RESET         15
 
-#define CAST(T, val) (*(T*)&(val))
+#define CAST(T, val) ((val).T)
 
 #define FIFO_SIZE 64
 
-enum {
+typedef enum {
   RC522_ANTENNA_OFF,
   RC522_ANTENNA_ON
 } AntennaStatus;
 
-typedef struct {
+typedef struct  {
   int8_t spi_id;
   u8     pin_ss;
   u8     pin_rst;
@@ -318,13 +373,12 @@ typedef struct {
 
 /* class rc522 */
 void rc522_init( rfid_dev dev );
-u8   rc522_readreg( rfid_dev dev, u8 addr );
-void rc522_writereg( rfid_dev dev, u8 addr, u8 val );
+Rc522Reg  rc522_readreg( rfid_dev dev, u8 addr );
+void rc522_writereg( rfid_dev dev, u8 addr, Rc522Reg val );
 void rc522_reset( rfid_dev dev );
-void rc522_sendcmd( rfid_dev dev, u8 cmd,
-		    u8 *arg=NULL, size_t szarg=0,
-		    u8 *res=NULL, size_t *szres=NULL);
-void rc522_antenna( rfid_dev, AntennaStatus );
+int rc522_sendcmd( rfid_dev dev, u8 cmd,
+		   u8 *arg, size_t szarg,
+		   u8 *res );
 int rc522_selftest( rfid_dev );
 
 #ifdef __cplusplus

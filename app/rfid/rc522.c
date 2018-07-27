@@ -4,10 +4,17 @@
 
 // ======== for initialize ========
 #define rc522_pin_init( v ) {\
-    platform_gpio_mode( (v) PLATFORM_GPIO_OUTPUT, PLATFORM_GPIO_FLOAT ); \
+    platform_gpio_mode( (v), PLATFORM_GPIO_OUTPUT, PLATFORM_GPIO_FLOAT ); \
     platform_gpio_write( (v), PLATFORM_GPIO_HIGH ); \
   }
-#define rc522_reg_init( d, r, v ) rc522_writereg( (d), (r), CAST(u8, v) )  
+#define readreg( d, r ) rc522_readreg((d), (r)).b##r
+#define writereg(d, r, v) {			\
+  Rc522Reg byte;				\
+  byte.b##r = v;				\
+  rc522_writereg((d), (r), byte);		\
+  }
+
+static void rc522_antenna( rfid_dev dev, AntennaStatus st );
 
 void rc522_init( rfid_dev dev )
 {
@@ -19,7 +26,18 @@ void rc522_init( rfid_dev dev )
   rc522_reset( dev );
 
   // initial register
-  bTModeReg tmode = {  };
+  bTModeReg tmode = { 0xd, 0, 0, 1 };
+  writereg(dev, TModeReg, tmode);
+  bTPrescalerReg tpres = {0x3e};
+  writereg(dev, TPrescalerReg, tpres);
+  bTReloadRegL btrl = {30};
+  writereg(dev, TReloadRegL, btrl);
+  bTReloadRegH btrh = {0};
+  writereg(dev, TReloadRegH, btrh);
+  bTxAutoReg btxa = {1};
+  writereg(dev, TxAutoReg, btxa);
+  bModeReg bmode = {2, 1, 1};
+  writereg(dev, ModeReg, bmode);
 
   // turn on the antenna
   rc522_antenna( dev, RC522_ANTENNA_ON );
@@ -28,6 +46,11 @@ void rc522_init( rfid_dev dev )
 // ======== for register r/w ========
 typedef struct {
 u8 :1, address:6, flag:1;
+} spiaddr;
+
+typedef union {
+  spiaddr spiaddr;
+  u8 addr;
 } rc522_spiaddr;
 
 #define SPI_READ  1
@@ -37,39 +60,44 @@ u8 :1, address:6, flag:1;
 #define RC522_SPI_CLOSE(d) platform_gpio_write((d)->pin_ss, PLATFORM_GPIO_HIGH)
 #define SPI_BITSIZE sizeof(u8)
 
-void rc522_writereg( rfid_dev dev, u8 addr, u8 val )
+void rc522_writereg( rfid_dev dev, u8 addr, Rc522Reg val )
 {
   RC522_SPI_OPEN(dev);
 
-  rc522_spiaddr regaddr = { addr, SPI_WRITE };
-  spi_data_type data = (CAST(u8, regaddr) << 8) | val;
+  rc522_spiaddr regaddr;
+  spiaddr spiaddr = { addr, SPI_WRITE };
+  regaddr.spiaddr = spiaddr;
+  
+  spi_data_type data = (regaddr.addr << SPI_BITSIZE) | val.bRegister;
   platform_spi_send( dev->spi_id, SPI_BITSIZE*2, data );
   
   RC522_SPI_CLOSE(dev);
 }
 
-u8 rc522_readreg( rfid_dev dev, u8 addr )
+Rc522Reg rc522_readreg( rfid_dev dev, u8 addr )
 {
   RC522_SPI_OPEN(dev);
 
-  rc522_spiaddr regaddr = { addr, SPI_READ };
-  spi_data_type data = CAST(u8, regaddr) << 8;
+  rc522_spiaddr regaddr;
+  spiaddr spiaddr = { addr, SPI_READ };
+  regaddr.spiaddr = spiaddr;
+  
+  spi_data_type data = regaddr.addr << 8;
   spi_data_type res = platform_spi_send_recv( dev->spi_id, SPI_BITSIZE*2, data );
   
   RC522_SPI_CLOSE(dev);
-  
-  return (u8) res;
-}
 
-#define readreg( d, r ) CAST(b##r, rc522_readreg((d), (r)))
-#define writereg(d, r, b) rc522_writereg((d), (r), CAST(u8, b))
+  Rc522Reg ret;
+  ret.bRegister = (u8)res;
+  return ret;
+}
 
 void rc522_reset( rfid_dev dev )
 {
-  rc522_sendcmd( dev, CMD_SOFT_RESET );
+  rc522_sendcmd( dev, CMD_SOFT_RESET, NULL, 0, NULL );
 }
 
-void rc522_antenna( rfid_dev dev, AntennaStatus st )
+static void rc522_antenna( rfid_dev dev, AntennaStatus st )
 {
   bTxControlReg v = readreg( dev, TxControlReg );
   v.Tx1RFEn = st;
@@ -94,8 +122,11 @@ static int to_fifo(rfid_dev dev, u8 *buff, size_t sz)
   RC522_SPI_OPEN( dev );
   
   // send addr
-  rc522_spiaddr addr = { FIFODataReg, SPI_WRITE };
-  spi_data_type t = (spi_data_type)CAST( u8, addr );
+  rc522_spiaddr regaddr;
+  spiaddr spiaddr = { FIFODataReg, SPI_WRITE };
+  regaddr.spiaddr = spiaddr;
+  
+  spi_data_type t = regaddr.addr;
   platform_spi_send( dev->spi_id, SPI_BITSIZE, t );
 
   // send data
@@ -116,8 +147,10 @@ static size_t from_fifo(rfid_dev dev, u8 *buff)
 
   // init array
   int id = dev->spi_id;
-  rc522_spiaddr d = { FIFODataReg, SPI_READ };
-  os_memset( buff, (int)CAST(u8, d), sz );
+  rc522_spiaddr regaddr;
+  spiaddr spiaddr = { FIFODataReg, SPI_READ };
+  regaddr.spiaddr = spiaddr;
+  os_memset( buff, regaddr.addr, sz );
   
   RC522_SPI_OPEN(dev);
 
@@ -129,7 +162,7 @@ static size_t from_fifo(rfid_dev dev, u8 *buff)
   return sz;
 }
 
-static void wait_cmd( dev )
+static int wait_cmd( rfid_dev dev )
 {
   bCommandReg r = readreg(dev, CommandReg);
   
@@ -145,7 +178,9 @@ static void wait_cmd( dev )
     break;
   default:
     // won't auto finish 
-    r = { CMD_IDLE, 0, 0 };
+    r.Command = CMD_IDLE;
+    r.PowerDown = 0;
+    r.RcvOff = 0;
     writereg( dev, CommandReg, r );
     return 1;
   }
@@ -160,27 +195,29 @@ static void wait_cmd( dev )
   return 0;
 }
 
-#define exec_cmd( dev, cmd ) {			\
-  bCommandReg bcmd = {cmd, 0, 0};		\
-  writereg( dev, CommandReg, bcmd );		\
-  }
+static inline void exec_cmd( rfid_dev dev, u8 cmd )
+{			
+  bCommandReg bcmd = {cmd, 0, 0};		
+  writereg( dev, CommandReg, bcmd );		
+}
 
 #define rc522_cmd_nofifo exec_cmd
 
-#define wait_crc_done(dev) { \
-  bStatus1Reg bst = readreg(dev, Status1Reg); \  
-while( bst.CRCReady == 0 ){			\
-  system_soft_wdt_feed();			\
-  os_delay_us( 100 );				\
-  bst = readreg(dev, Status1Reg);		\
- }						\
+static inline void wait_crc_done(rfid_dev dev)
+{					
+  bStatus1Reg bst = readreg(dev, Status1Reg); 
+  while( bst.CRCReady == 0 ){		
+    system_soft_wdt_feed();		
+    os_delay_us( 100 );			
+    bst = readreg(dev, Status1Reg);	
+  }					
 }
 
 static int rc522_cmd_crc( rfid_dev dev, u8* buff, size_t sz )
 {
   // if current command is crc then fill fifo only
   bCommandReg bcmd = readreg(dev, CommandReg);
-  if( r.Command == CMD_CALC_CRC ){
+  if( bcmd.Command == CMD_CALC_CRC ){
     wait_crc_done( dev );
     to_fifo(dev, buff, sz);
   }
@@ -188,7 +225,9 @@ static int rc522_cmd_crc( rfid_dev dev, u8* buff, size_t sz )
     wait_cmd( dev );
     to_fifo(dev, buff, sz);
 
-    bcmd = {CMD_CALC_CRC, 0, 0};
+    bcmd.Command = CMD_CALC_CRC;
+    bcmd.PowerDown = 0;
+    bcmd.RcvOff = 0;
     writereg(dev, CommandReg, bcmd);
   }
 
@@ -206,7 +245,6 @@ static int rc522_cmd_readfifo( rfid_dev dev, u8 *buff )
 
   // flush the fifo
   clear_fifo( dev );
-  writereg( dev, FIFOLevelReg, flag );
 
   // exec the cmd
   exec_cmd( dev, CMD_TRANSMIT );
@@ -256,11 +294,53 @@ static int rc522_cmd_auth( rfid_dev dev, u8 *data )
   else return 0;
 }
 
+#define wait_transmit_done(dev) {\
+  bStatus2Reg bst = readreg(dev, Status2Reg); \
+  while(0 == (bst.ModemState & 0x04)){	      \
+    system_soft_wdt_feed();		      \
+    os_delay_us(100);			      \
+    bst = readreg(dev, Status2Reg);	      \
+  }					      \
+  }
+#define wait_receive_done(dev) {\
+  bStatus2Reg bst = readreg(dev, Status2Reg); \
+  while(0 != (bst.ModemState & 0x04)){	      \
+    system_soft_wdt_feed();		      \
+    os_delay_us(100);			      \
+    bst = readreg(dev, Status2Reg);	      \
+  }					      \
+  }
+
 static int rc522_cmd_transceive(rfid_dev dev, u8 *arg, size_t szarg, u8 *res)
 {
-  wait_cmd( dev );
+  bCommandReg bcmd = readreg( dev, CommandReg );
+
+  if( bcmd.Command != CMD_TRANSCEIVE ){
+    // prepare for the transmition
+    // TODO
+    exec_cmd(dev, CMD_TRANSCEIVE);
+  }
   
-  
+  // start a new transmittion  
+  to_fifo(dev, arg, szarg);
+  bBitFramingReg flag = {0, 0, 1};
+  writereg( dev, BitFramingReg, flag );
+
+  wait_transmit_done( dev );
+  wait_receive_done( dev );
+
+  // check if error exists
+  Rc522Reg e = rc522_readreg( dev, ErrorReg );
+  if( 0 != e.bRegister ) {
+    // get error. cancel the command
+    exec_cmd(dev, CMD_IDLE);
+    return -1;
+  }
+
+  size_t len = from_fifo(dev, res);
+  bControlReg ext = readreg(dev, ControlReg);
+  if( ext.RxLastBits == 0 ) return len * SPI_BITSIZE;
+  else return ext.RxLastBits + (len-1) * SPI_BITSIZE;
 }
 
 // name        num FIFO :len:   :flush:   :fin:
@@ -308,4 +388,10 @@ int rc522_sendcmd(
   default:
     return rc522_cmd_transceive(dev, arg, szarg, res);
   }
+}
+
+int rc522_selftest( rfid_dev dev )
+{
+  //TODO
+  return -1;
 }
