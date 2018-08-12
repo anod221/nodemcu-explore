@@ -37,7 +37,7 @@ local function setup_oled()
 	oled_dev:setFont( u8g.font_6x10 )
 end
 
- function oled( line, str, ... )
+local function oled( line, str, ... )
 	if oled_dev == nil then return end
 
 	oled_dev:firstPage()
