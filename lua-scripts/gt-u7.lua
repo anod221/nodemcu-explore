@@ -13,8 +13,8 @@ local wifi_cfg = {
 }
 local oled_cfg = {
    i2c = {
-      sda = 5,
-      scl = 6,
+      sda = 1,
+      scl = 2,
       sla = 0x3c
    },
    chip = "ssd1306_128x64",
@@ -90,7 +90,7 @@ local function setup_wifi( next )
 	conn()
 end
 
-function main()
+function _main()
 	local cli = mqtt.Client( "gps-receiver", 300, mqtt_cfg.user, mqtt_cfg.pwd )
 
 	local function on_gps( data )
@@ -130,9 +130,21 @@ function main()
 	setup_mqtt()
 end
 
+function main(  )
+	local function on_nmea( data )
+		local date, time, longitude, latitude = tinynmea.parse( data )
+		if date ~= nil then
+			oled( {{"D:%s", date}, {"T:%s", time}, {"LO:%s", longitude}, {"LA:%s", latitude}} )
+		end
+	end
+
+	debug( "receiving..." );
+	setup_uart( on_nmea )
+end
+
 function start()
    setup_oled()
-   setup_wifi( main )
+   main()
 end
 
 start()
