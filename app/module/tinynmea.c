@@ -22,13 +22,15 @@ typedef struct {
 #define has_capacity( p, l, s ) ( p+s <= l+sizeof(l) )
 #define has_gps( d ) ((d)->gps != 0)
 
-static gprmc_data* parse( char c ){
-  static gprmc_data result;
-  static uint8_t state = 0;
-  static char *pbuff;
-  static uint8_t checksum;
-  static uint8_t msgsum;
+// 下面的变量本来放在parse里面的，但是放进去heap马上小了1000
+// 只好放外面来了，放在外面不会影响heap的大小。。。
+static gprmc_data result;
+static uint8_t state = 0;
+static char *pbuff;
+static uint8_t checksum;
+static uint8_t msgsum;
 
+static gprmc_data* parse( char c ){
   gprmc_data* retval = NULL;
   switch( state ){
   case 0:
