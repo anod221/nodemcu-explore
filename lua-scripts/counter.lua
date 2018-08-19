@@ -1,6 +1,5 @@
 -- 光耦计数器模块
 
-local modname = "Counter"
 local Module = {}
 local global = global or _G
 

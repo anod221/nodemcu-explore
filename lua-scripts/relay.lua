@@ -1,6 +1,5 @@
 -- 光耦计数器模块
 
-local modname = "Relay"
 local Module = {}
 local global = global or _G
 

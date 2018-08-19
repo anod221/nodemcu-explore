@@ -1,7 +1,6 @@
 -- 5线4相步进电机模块
 -- see http://www.elecfans.com/kongzhijishu/sifuyukongzhi/534214_a.html
 
-local modname = "StepperMotorL5"
 local Module = {}
 local global = global or _G
 

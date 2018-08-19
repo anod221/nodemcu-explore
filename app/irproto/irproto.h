@@ -17,6 +17,22 @@ extern "C" {
     IRPROTO_MAX
   };
 
+  // ================
+  // 发送相关
+  // ================
+  typedef void (*setup_carrier)( uint32 khz, uint32 duty_cicle );
+  typedef void (*irmark)( uint32 usec );
+  typedef void (*irspace)( uint32 desc );
+  typedef int (*irsender)( uint32_t code );
+
+  irsender irproto_encode_map[IRPROTO_MAX];
+  
+  int ir_set_writer( setup_carrier, irmark, irspace );
+  int ir_send_nec( uint32_t code );
+
+  // ================
+  // 接收相关
+  // ================
   // 就是一个状态机。为了能够兼容多数的红外协议，所以
   // 需要替换proto函数
   typedef uint32 (*irproto)( 	// 返回：下一状态
