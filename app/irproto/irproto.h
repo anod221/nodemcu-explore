@@ -20,7 +20,7 @@ extern "C" {
   // ================
   // 发送相关
   // ================
-  typedef void (*setup_carrier)( uint32 khz, uint32 duty_cicle );
+  typedef void (*setup_carrier)( uint32 hz, uint32 duty_cicle );
   typedef void (*irmark)( uint32 usec );
   typedef void (*irspace)( uint32 desc );
   typedef int (*irsender)( uint32_t code );

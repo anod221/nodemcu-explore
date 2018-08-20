@@ -108,7 +108,7 @@ int ir_send_nec( uint32_t code )
   if( engine == NULL ) return -1;
 
   // nec载波
-  engine->setup( 38, 4 );
+  engine->setup( 37900, 4 );
   
   const irmark MARK = engine->mark;
   const irspace SPACE = engine->space;
