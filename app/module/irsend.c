@@ -4,10 +4,33 @@
 #include "c_stdlib.h"
 #include "task/task.h"
 #include "irproto.h"
+#include "driver/uart.h"
 
 // see https://www.analysir.com/blog/2017/01/29/updated-esp8266-nodemcu-backdoor-upwm-hack-for-ir-signals/
 static uint8_t tx_val;
 static uint32_t usec_perbyte;
+
+#define PIN_IRSEND 4
+#define CARRIER_TX 1
+#define BIT_PER_TX_BYTE 10 // 8bit + 2signal
+#define USEC_PER_SECOND (1000*1000)
+#define WDT_FEED_LOOP 64
+
+#define DUTY_10_PERCENT 0xff
+#define DUTY_20_PERCENT 0xfe
+#define DUTY_30_PERCENT 0xfc
+#define DUTY_40_PERCENT 0xf8
+#define DUTY_50_PERCENT 0xf0
+
+#define BAUDRATE_AS_CARRIER( hz ) ((hz) * BIT_PER_TX_BYTE)
+
+#define wait_tx_empty() while((READ_PERI_REG(UART_STATUS(CARRIER_TX)) & (UART_TXFIFO_CNT<<UART_TXFIFO_CNT_S)) > 0);
+#define us2ms( usec ) ((usec)/1000)
+
+inline void delay_one_msec()
+{
+  os_delay_us(1000);
+}
 
 // irsend.send( code, mode=nil )
 static int ICACHE_FLASH_ATTR irsend_write( lua_State *L )
@@ -20,40 +43,60 @@ static int ICACHE_FLASH_ATTR irsend_write( lua_State *L )
   luaL_argcheck(L, 0 < mode && mode < IRPROTO_MAX, 2, "invalid mode");
 
   irsender s = irproto_encode_map[mode];
-  UartConfig curcfg = uart_get_config(0);
-  ETS_UART_INTR_DISABLE();
   int r = s(code);
-  ETS_UART_INTR_ENABLE();
   lua_pushinteger( L, r );
   
-  platform_uart_setup( 0, curcfg.baut_rate, curcfg.data_bits, curcfg.parity, curcfg.stop_bits );
-
   return 1;
 }
 
-extern UartDevice UartDev;
+// see app/driver/uart.c:73
+// If call the uart_config function directly, a pulse will be found. 
+// Because the bit UART_TXD_INV is not set when write the UART_CONF0 reg.
+// To avoid this, the bit should be set when call the WRITE_PERI_REG.
 void set_uart( uint32 baudrate )
 {
-  UartDev.baut_rate = baudrate;
-  UartDev.data_bits = EIGHT_BITS;
-  UartDev.stop_bits = ONE_STOP_BIT;
-  UartDev.parity = NONE_BITS;
-  uart_setup( 1 );
-  SET_PERI_REG_MASK( UART_CONF0(1), BIT22 );
+  wait_tx_empty();
+
+  ETS_UART_INTR_DISABLE();
+
+  PIN_FUNC_SELECT(PERIPHS_IO_MUX_GPIO2_U, FUNC_U1TXD_BK);
+  uart_div_modify(CARRIER_TX, UART_CLK_FREQ / (baudrate));
+  WRITE_PERI_REG(
+    UART_CONF0( CARRIER_TX ),
+    ((STICK_PARITY_DIS & UART_PARITY_EN_M) << UART_PARITY_EN_S) //SET BIT AND PARITY MODE
+    | ((NONE_BITS & UART_PARITY_M) << UART_PARITY_S )
+    | ((ONE_STOP_BIT & UART_STOP_BIT_NUM) << UART_STOP_BIT_NUM_S)
+    | ((EIGHT_BITS & UART_BIT_NUM) << UART_BIT_NUM_S)
+    | UART_TXD_INV
+  );
+
+  //clear rx and tx fifo,not ready
+  SET_PERI_REG_MASK(UART_CONF0(CARRIER_TX), UART_RXFIFO_RST | UART_TXFIFO_RST);
+  CLEAR_PERI_REG_MASK(UART_CONF0(CARRIER_TX), UART_RXFIFO_RST | UART_TXFIFO_RST);
+
+  //set rx fifo trigger( UART1 has no rx )
+  // WRITE_PERI_REG(UART_CONF1(CARRIER_TX), (UartDev.rcv_buff.TrigLvl & UART_RXFIFO_FULL_THRHD) << UART_RXFIFO_FULL_THRHD_S);
+
+  //clear all interrupt
+  WRITE_PERI_REG(UART_INT_CLR(CARRIER_TX), 0xffff);
+  //enable rx_interrupt
+  SET_PERI_REG_MASK(UART_INT_ENA(CARRIER_TX), UART_RXFIFO_FULL_INT_ENA);
+
+  ETS_UART_INTR_ENABLE();
 }
 
-#define SET_PERI_REG_MASK(reg, mask)   WRITE_PERI_REG((reg), (READ_PERI_REG(reg)|(mask)))
-void set_carrier( uint32 khz, uint32 duty )
+void set_carrier( uint32 hz, uint32 duty )
 {
   // set the pwm
-  uint32 baudrate = khz * 1000 * 10;
-  usec_perbyte = 10 * 1000000 / baudrate;// 1s = 1000 * 1000 us
+  uint32 baudrate = BAUDRATE_AS_CARRIER(hz);
+  usec_perbyte = BIT_PER_TX_BYTE * USEC_PER_SECOND / baudrate;
+  if( duty == 1 ) tx_val = DUTY_10_PERCENT;
+  else if( duty == 2 ) tx_val = DUTY_20_PERCENT;
+  else if( duty == 3 ) tx_val = DUTY_30_PERCENT;
+  else if( duty == 4 ) tx_val = DUTY_40_PERCENT;
+  else tx_val = DUTY_50_PERCENT;
+
   set_uart( baudrate );
-  if( duty == 1 ) tx_val = 0xff;
-  else if( duty == 2 ) tx_val = 0xfe;
-  else if( duty == 3 ) tx_val = 0xfc;
-  else if( duty == 4 ) tx_val = 0xf8;
-  else tx_val = 0xf0;
 }
 
 void send_mark( uint32 usec )
@@ -62,38 +105,35 @@ void send_mark( uint32 usec )
 
   system_soft_wdt_feed();
   while( npwm-->0 ){
-    uart_tx_one_char(1, tx_val);
-    if( npwm % 64 == 0 ) system_soft_wdt_feed();
+    uart_tx_one_char(CARRIER_TX, tx_val);
+
+    if( npwm % WDT_FEED_LOOP == 0 )
+      system_soft_wdt_feed();
   }
   
-  while ((READ_PERI_REG(UART_STATUS(1)) & (UART_TXFIFO_CNT<<UART_TXFIFO_CNT_S)) > 0);
+  wait_tx_empty();
 }
 
 void send_space( uint32 usec )
 {
-  if( usec <= 65535 ) os_delay_us( usec-5 );//e.g. comp, add, push, call, leave, ret.
+  if( usec <= USHRT_MAX ) os_delay_us( usec-5 );//e.g. comp, add, push, call, leave, ret.
   else {
-    uint32 now = system_get_time();
-    uint32 end = now + usec/1000;
-    uint32 delay = usec % 1000;
-    if( end < now ){// overflow
-      while( system_get_time() < (uint32)0xffffffff ){
-	os_delay_us(1000);
+    uint32 ms_now = system_get_time();
+    uint32 ms_end = ms_now + us2ms(usec);
+    uint32 us_delay = usec % 1000;
+    if( ms_end < ms_now ){// overflow
+      while( system_get_time() < UINT_MAX ){
+	delay_one_msec();
 	system_soft_wdt_feed();
       }
-      os_delay_us(1000);
+      delay_one_msec();
     }
-    while( system_get_time() < end ){
-      os_delay_us(1000);
+    while( system_get_time() < ms_end ){
+      delay_one_msec();
       system_soft_wdt_feed();
     }
-    os_delay_us( delay - 6 );// e.g. leave, ret, compare, push, call, leave, ret
+    os_delay_us( us_delay - 6 );// e.g. leave, ret, compare, push, call, leave, ret
   }
-}
-
-int irsend_setup( lua_State *L ){
-  platform_gpio_mode( 4, PLATFORM_GPIO_OUTPUT, PLATFORM_GPIO_FLOAT );
-  platform_gpio_write( 4, PLATFORM_GPIO_LOW );
 }
 
 int luaopen_irsend( lua_State *L )
@@ -105,7 +145,6 @@ static const LUA_REG_TYPE irsend_map[] = {
   // for module constants
   { LSTRKEY("NEC"), LNUMVAL(IRPROTO_NEC) },
   // for module function
-  { LSTRKEY("setup"), LFUNCVAL(irsend_setup) },
   { LSTRKEY("send"), LFUNCVAL(irsend_write) },
   // --------
   {LNILKEY, LNILVAL}
