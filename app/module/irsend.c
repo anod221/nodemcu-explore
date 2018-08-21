@@ -8,7 +8,8 @@
 
 // see https://www.analysir.com/blog/2017/01/29/updated-esp8266-nodemcu-backdoor-upwm-hack-for-ir-signals/
 static uint8_t tx_val;
-static uint32_t usec_perbyte;
+// use integer instead of real，for precision, store 100 byte instead of 1 byte
+static uint32_t usec_per100bytes;
 
 #define PIN_IRSEND 4
 #define CARRIER_TX 1
@@ -89,7 +90,7 @@ void set_carrier( uint32 hz, uint32 duty )
 {
   // set the pwm
   uint32 baudrate = BAUDRATE_AS_CARRIER(hz);
-  usec_perbyte = BIT_PER_TX_BYTE * USEC_PER_SECOND / baudrate;
+  usec_per100bytes = BIT_PER_TX_BYTE * USEC_PER_SECOND / (baudrate/100);
   if( duty == 1 ) tx_val = DUTY_10_PERCENT;
   else if( duty == 2 ) tx_val = DUTY_20_PERCENT;
   else if( duty == 3 ) tx_val = DUTY_30_PERCENT;
@@ -101,7 +102,7 @@ void set_carrier( uint32 hz, uint32 duty )
 
 void send_mark( uint32 usec )
 {
-  int npwm = usec / usec_perbyte;
+  int npwm = 100 * usec / usec_per100bytes;
 
   system_soft_wdt_feed();
   while( npwm-->0 ){
