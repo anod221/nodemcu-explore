@@ -28,10 +28,7 @@ static uint32_t usec_per100bytes;
 #define wait_tx_empty() while((READ_PERI_REG(UART_STATUS(CARRIER_TX)) & (UART_TXFIFO_CNT<<UART_TXFIFO_CNT_S)) > 0);
 #define us2ms( usec ) ((usec)/1000)
 
-inline void delay_one_msec()
-{
-  os_delay_us(1000);
-}
+#define delay_one_msec() os_delay_us(1000)
 
 // irsend.send( code, mode=nil )
 static int ICACHE_FLASH_ATTR irsend_write( lua_State *L )

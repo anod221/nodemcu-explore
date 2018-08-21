@@ -36,6 +36,10 @@ irproto irproto_decode_map[] = {
 //**************************************
 // see https://www.sbprojects.net/knowledge/ir/nec.php
 // TIME CONSTRANT FOR NEC IR PROTOCOL
+#define NEC_CARRIER_FREQ 37900
+#define NEC_CARRIER_DUTY 4	// 40%
+#define MASK_FOR_ONE_BYTE ((1<<sizeof(u8))-1)
+
 #define ACCEPTABLE_BIAS 150	// 协议接收j时间的可接受误差范围
 
 #define AGC_MARK 9000
@@ -67,7 +71,7 @@ enum{
 static uint32 reverse_per_byte( uint32 c )
 {
   uint32 retval = 0;
-  for( uint32 mask = 0xff, nshift = 0; mask > 0; mask <<= 8, nshift += 8 )
+  for( uint32 mask = MASK_FOR_ONE_BYTE, nshift = 0; mask > 0; mask <<= 8, nshift += 8 )
     {
       uint8_t byte = (c & mask) >> nshift, rev = 0;
       for( uint8_t cur = 1; cur > 0; cur <<= 1 ){
@@ -125,7 +129,7 @@ int ir_send_nec( uint32_t code )
   code = reverse_per_byte(code);// notice that the nec is LSB ahead
     
   // nec载波
-  engine->setup( 37900, 4 );
+  engine->setup( NEC_CARRIER_FREQ, NEC_CARRIER_DUTY );
   
   const irmark MARK = engine->mark;
   const irspace SPACE = engine->space;
