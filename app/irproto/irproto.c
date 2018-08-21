@@ -64,6 +64,21 @@ enum{
 
 #define match( t, expect, next ) ( (abs((t)-(expect)) < ACCEPTABLE_BIAS) ? (next) : IRPROTO_STATE_ERROR )
 
+static uint32 reverse_per_byte( uint32 c )
+{
+  uint32 retval = 0;
+  for( uint32 mask = 0xff, nshift = 0; mask > 0; mask <<= 8, nshift += 8 )
+    {
+      uint8_t byte = (c & mask) >> nshift, rev = 0;
+      for( uint8_t cur = 1; cur > 0; cur <<= 1 ){
+	rev <<= 1;
+	rev |= (byte & cur) ? 1 : 0;
+      }
+      retval |= rev << nshift;
+    }
+  return retval;
+}
+
 // usec:
 // example 48989587,9107,4495,614,553,613,549,616,551,613,552,613,552,612,554,612,553,612,552,613,1665,585,1665,586,1664,587,1638,611,1640,611,1664,585,1639,611,1665,586,1664,586,554,611,553,613,1664,586,1664,587,552,613,551,614,553,612,552,614,1664,586,1664,587,552,613,553,612,1640,611,1640,611,1640,609,39669,9121,2221,611
 // example 12608055,9122,4496,613,552,615,551,614,553,612,551,615,552,614,552,614,552,614,550,616,1664,586,1664,588,1640,610,1664,587,1664,587,1640,611,1638,613,1640,611,1664,587,1639,612,1664,587,552,613,552,614,552,614,1664,587,552,613,553,613,553,613,552,613,1665,587,1664,586,1639,613,551,613,1643,610
@@ -107,13 +122,15 @@ int ir_send_nec( uint32_t code )
 {
   if( engine == NULL ) return -1;
 
+  code = reverse_per_byte(code);// notice that the nec is LSB ahead
+    
   // nec载波
   engine->setup( 37900, 4 );
   
   const irmark MARK = engine->mark;
   const irspace SPACE = engine->space;
   uint32_t mask = ~( (uint32_t)(~0)>>1 );
-
+  
   // AGC
   dummy();
   MARK( AGC_MARK );

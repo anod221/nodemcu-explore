@@ -136,6 +136,12 @@ void send_space( uint32 usec )
   }
 }
 
+int irsend_setup( lua_State *L )
+{
+  SET_PERI_REG_MASK( UART_CONF0( CARRIER_TX ), UART_TXD_INV );
+  return 0;
+}
+
 int luaopen_irsend( lua_State *L )
 {
   ir_set_writer( set_carrier, send_mark, send_space );
@@ -146,6 +152,7 @@ static const LUA_REG_TYPE irsend_map[] = {
   { LSTRKEY("NEC"), LNUMVAL(IRPROTO_NEC) },
   // for module function
   { LSTRKEY("send"), LFUNCVAL(irsend_write) },
+  { LSTRKEY("setup"), LFUNCVAL(irsend_setup) }, 
   // --------
   {LNILKEY, LNILVAL}
 };
