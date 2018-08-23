@@ -37,7 +37,7 @@ irproto irproto_decode_map[] = {
 // see https://www.sbprojects.net/knowledge/ir/nec.php
 // TIME CONSTRANT FOR NEC IR PROTOCOL
 #define NEC_CARRIER_FREQ 37900
-#define NEC_CARRIER_DUTY 4	// 40%
+#define NEC_CARRIER_DUTY 40	// 40%
 #define MASK_FOR_ONE_BYTE ((1<<sizeof(u8))-1)
 
 #define ACCEPTABLE_BIAS 150	// 协议接收j时间的可接受误差范围

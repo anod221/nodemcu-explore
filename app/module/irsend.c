@@ -88,6 +88,8 @@ void set_carrier( uint32 hz, uint32 duty )
   // set the pwm
   uint32 baudrate = BAUDRATE_AS_CARRIER(hz);
   usec_per100bytes = BIT_PER_TX_BYTE * USEC_PER_SECOND / (baudrate/100);
+
+  duty /= 10;
   if( duty == 1 ) tx_val = DUTY_10_PERCENT;
   else if( duty == 2 ) tx_val = DUTY_20_PERCENT;
   else if( duty == 3 ) tx_val = DUTY_30_PERCENT;
@@ -134,6 +136,22 @@ void send_space( uint32 usec )
   }
 }
 
+int irsend_signal( lua_State *L )
+{
+    int freq = luaL_checkinteger(L, 1);
+    int duty = luaL_checkinteger(L, 2);
+    int narg = lua_gettop(L);
+    int pulse = 1;
+    set_carrier( freq, duty );
+    for( int i=3; i <= narg; ++i ){
+      int usec = luaL_checkinteger(L, i);
+      if( pulse ) send_mark( usec );
+      else send_space( usec );
+      pulse = !pulse;
+    }
+    return 0;
+}
+
 int irsend_setup( lua_State *L )
 {
   SET_PERI_REG_MASK( UART_CONF0( CARRIER_TX ), UART_TXD_INV );
@@ -149,6 +167,7 @@ static const LUA_REG_TYPE irsend_map[] = {
   // for module constants
   { LSTRKEY("NEC"), LNUMVAL(IRPROTO_NEC) },
   // for module function
+  { LSTRKEY("signal"), LFUNCVAL(irsend_signal) },
   { LSTRKEY("send"), LFUNCVAL(irsend_write) },
   { LSTRKEY("setup"), LFUNCVAL(irsend_setup) }, 
   // --------
